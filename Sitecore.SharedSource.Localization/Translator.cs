@@ -7,7 +7,7 @@ namespace Sitecore.SharedSource.Localization
     /// </summary>
     public class Translator : ITranslator
     {
-        internal TranslatorService m_TranslatorService = new TranslatorService();
+        internal TranslatorService _translatorService = new TranslatorService();
 
         /// <summary>
         /// Gets translated phrase for context language by specified translation key.
@@ -17,7 +17,7 @@ namespace Sitecore.SharedSource.Localization
         /// <returns>System.String.</returns>
         public virtual string Text(string key)
         {
-            return m_TranslatorService.Text(key, null, null);
+            return _translatorService.Text(key, null, null);
         }
 
         /// <summary>
@@ -30,7 +30,7 @@ namespace Sitecore.SharedSource.Localization
         /// <returns>System.String.</returns>
         public virtual string Text(string key, string defaultValue)
         {
-            return m_TranslatorService.Text(key, defaultValue, null);
+            return _translatorService.Text(key, defaultValue, null);
         }
 
         /// <summary>
@@ -43,7 +43,7 @@ namespace Sitecore.SharedSource.Localization
         /// <returns>System.String.</returns>
         public virtual string TextF(string key, params object[] formatParams)
         {
-            return m_TranslatorService.Text(key, null, formatParams);
+            return _translatorService.Text(key, null, formatParams);
         }
 
         /// <summary>
@@ -58,7 +58,7 @@ namespace Sitecore.SharedSource.Localization
         /// <returns>System.String.</returns>
         public virtual string TextF(string key, string defaultValue, object[] formatParams)
         {
-            return m_TranslatorService.Text(key, defaultValue, formatParams);
+            return _translatorService.Text(key, defaultValue, formatParams);
         }
     }
 }

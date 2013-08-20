@@ -135,7 +135,7 @@ namespace Sitecore.SharedSource.Localization.Infrastructure.Caching
 
                 if (dictionaryItem.TemplateID == Constants.DictionaryEntryTemplateId)
                 {
-                    var key = dictionaryItem[Constants.DictionaryEntryKeyFieldName];
+                    var key = dictionaryItem[Constants.DICTIONARY_ENTRY_KEY_FIELD_NAME];
                     if (!string.IsNullOrEmpty(key))
                     {
                         if (keyList.ContainsKey(key))

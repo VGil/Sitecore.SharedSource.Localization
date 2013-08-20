@@ -48,7 +48,7 @@ namespace Sitecore.SharedSource.Localization.Infrastructure.Caching
                     {
                         if (m_Instance == null)
                         {
-                            m_Instance = new SitecoreDictionaryCache(Constants.DictionaryCacheName, ModuleSettings.LocalizationMaxCacheSize);
+                            m_Instance = new SitecoreDictionaryCache(Constants.DICTIONARY_CACHE_NAME, ModuleSettings.LocalizationMaxCacheSize);
                         }
                     }
                 }

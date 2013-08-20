@@ -52,7 +52,7 @@ namespace Sitecore.SharedSource.Localization.Domain
                 var fieldRenderer = new FieldRenderer
                 {
                     Item = translationItem,
-                    FieldName = Constants.DictionaryEntryPhraseFieldName,
+                    FieldName = Constants.DICTIONARY_ENTRY_PHRASE_FIELD_NAME,
                 };
 
                 var result = fieldRenderer.Render();
@@ -140,8 +140,8 @@ namespace Sitecore.SharedSource.Localization.Domain
                 try
                 {
                     createdDictionaryEntry.Editing.BeginEdit();
-                    createdDictionaryEntry[Constants.DictionaryEntryKeyFieldName] = key;
-                    createdDictionaryEntry[Constants.DictionaryEntryPhraseFieldName] = defaultValue;
+                    createdDictionaryEntry[Constants.DICTIONARY_ENTRY_KEY_FIELD_NAME] = key;
+                    createdDictionaryEntry[Constants.DICTIONARY_ENTRY_PHRASE_FIELD_NAME] = defaultValue;
                     createdDictionaryEntry.Editing.EndEdit();
 
                     Logger.Info(string.Format(
