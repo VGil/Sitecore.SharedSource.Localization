@@ -2,6 +2,7 @@
 using System.Linq;
 using Sitecore.Data;
 using Sitecore.Data.Items;
+using Sitecore.Globalization;
 using Sitecore.SecurityModel;
 using Sitecore.SharedSource.Localization.Infrastructure;
 using Sitecore.SharedSource.Localization.Infrastructure.Caching;
@@ -24,16 +25,17 @@ namespace Sitecore.SharedSource.Localization.Domain
 	    }
 
 	    /// <summary>
-        /// Gets translated phrase for context language by specified translation key.
-        /// With option of formatting like string.Format() method functionality.
-        /// Dictionary entry item will be created if it doesn't exist with default phrase value 
-        /// equals to passed parameter (or it will be equal to translation key in case default value is null or empty).
-        /// </summary>
-        /// <param name="key">The key.</param>
-        /// <param name="defaultValue">The default value.</param>
-        /// <param name="formatParams">The format params.</param>
-        /// <returns>System.String.</returns>
-        public virtual string Text(string key, string defaultValue, params object[] formatParams)
+	    /// Gets translated phrase for context language by specified translation key.
+	    /// With option of formatting like string.Format() method functionality.
+	    /// Dictionary entry item will be created if it doesn't exist with default phrase value 
+	    /// equals to passed parameter (or it will be equal to translation key in case default value is null or empty).
+	    /// </summary>
+	    /// <param name="key">The key.</param>
+	    /// <param name="defaultValue">The default value.</param>
+	    /// <param name="language"></param>
+	    /// <param name="formatParams">The format params.</param>
+	    /// <returns>System.String.</returns>
+	    public virtual string Text(string key, string defaultValue, Language language, params object[] formatParams)
         {
             try
             {
@@ -42,7 +44,7 @@ namespace Sitecore.SharedSource.Localization.Domain
                     return string.Empty;
                 }
 
-                var translationItem = GetTranslationItem(key, defaultValue);
+				var translationItem = GetTranslationItem(key, defaultValue, language ?? Context.Language);
 
                 if (translationItem == null)
                 {
@@ -72,64 +74,108 @@ namespace Sitecore.SharedSource.Localization.Domain
             }
         }
 
-        /// <summary>
-        /// Gets the translation item.
-        /// </summary>
-        /// <param name="key">The key.</param>
-        /// <param name="defaultValue">The default value.</param>
-        /// <returns>Item.</returns>
-        public virtual Item GetTranslationItem(string key, string defaultValue)
-        {
-            if (string.IsNullOrEmpty(key))
-            {
-                return null;
-            }
+	    /// <summary>
+	    /// Gets the translation item.
+	    /// </summary>
+	    /// <param name="key">The key.</param>
+	    /// <param name="defaultValue">The default value.</param>
+	    /// <param name="language"></param>
+	    /// <returns>Item.</returns>
+	    public virtual Item GetTranslationItem(string key, string defaultValue, Language language)
+	    {
+		    if (string.IsNullOrEmpty(key))
+		    {
+			    return null;
+		    }
 
-            var nestedInFolders = string.Empty;
-            if (key.Contains("/"))
-            {
-				nestedInFolders = key.Substring(0, key.LastIndexOf("/", StringComparison.InvariantCulture));
-				key = key.Substring(key.LastIndexOf("/", StringComparison.InvariantCulture) + 1, key.Length - key.LastIndexOf("/", StringComparison.InvariantCulture) - 1);
-            }
+		    var nestedInFolders = string.Empty;
+		    if (key.Contains("/"))
+		    {
+			    nestedInFolders = key.Substring(0, key.LastIndexOf("/", StringComparison.InvariantCulture));
+			    key = key.Substring(key.LastIndexOf("/", StringComparison.InvariantCulture) + 1,
+			                        key.Length - key.LastIndexOf("/", StringComparison.InvariantCulture) - 1);
+		    }
 
-            if (string.IsNullOrEmpty(defaultValue))
-            {
-                defaultValue = key;
-            }
+		    if (string.IsNullOrEmpty(defaultValue))
+		    {
+			    defaultValue = key;
+		    }
 
-            Logger.ExtraInfo(string.Format("Getting translation item for key '{0}' with default value '{1}')", key, defaultValue), this);
+		    Logger.ExtraInfo(
+			    string.Format("Getting translation item for key '{0}' with default value '{1}')", key, defaultValue), this);
 
-            if (ModuleSettings.LocalizationCreateItemsWithDefaultValues)
-            {
-                return !_dictionaryCache.DictionaryEntryExists(key)
-                    ? CreateDictionaryEntryWithDefaultValue(key, defaultValue, nestedInFolders)
-                    : GetDictionaryEntry(key);
-            }
+		    Item entry = null;
 
-            return GetDictionaryEntry(key);
+		    if (ModuleSettings.CreateItemsWithDefaultValues)
+		    {
+			    entry = !_dictionaryCache.DictionaryEntryExists(key)
+				            ? CreateDictionaryEntryWithDefaultValue(key, defaultValue, language, nestedInFolders)
+				            : GetDictionaryEntry(key, language);
+		    }
+		    else
+		    {
+			    entry = GetDictionaryEntry(key, language);
+		    }
+
+		    if (string.IsNullOrEmpty(entry[Constants.DICTIONARY_ENTRY_PHRASE_FIELD_NAME]))
+		    {
+				Logger.ExtraInfo(string.Format(
+						"Creating translation item version for key '{0}' with default value '{1}' and Language '{2}'", 
+						key, 
+						defaultValue, 
+						language), 
+					this);
+
+				entry = _siteContext.MasterDb.GetItem(entry.ID, language);
+
+				if (!entry.Versions.GetVersions().Any())
+				{
+					using (new SecurityDisabler())
+					{
+						try
+						{
+							entry = entry.Versions.AddVersion();
+
+							entry.Editing.BeginEdit();
+
+							entry[Constants.DICTIONARY_ENTRY_PHRASE_FIELD_NAME] = defaultValue;
+							entry[Constants.DICTIONARY_ENTRY_KEY_FIELD_NAME] = key;
+
+							entry.Editing.EndEdit();
+						}
+						catch (Exception ex)
+						{
+							Logger.Error("Error creating item version.", ex, this);
+							entry.Editing.CancelEdit();
+						}
+					}
+				}
+		    }
+	   
+		    return entry;
         }
 
         #region Private
 
-        protected Item GetDictionaryEntry(string key)
+        protected Item GetDictionaryEntry(string key, Language language)
         {
             var itemId = _dictionaryCache.GetCache(key);
             if (itemId != Guid.Empty)
             {
-                return _siteContext.ContextDb.GetItem(new ID(itemId));
+	            return _siteContext.ContextDb.GetItem(new ID(itemId), language);
             }
 
-            return null;
+	        return null;
         }
 
-        protected virtual Item CreateDictionaryEntryWithDefaultValue(string key, string defaultValue, string nestedInFolders)
+        protected virtual Item CreateDictionaryEntryWithDefaultValue(string key, string defaultValue, Language language, string nestedInFolders)
         {
             using (new SecurityDisabler())
             {
-                var targetDictionaryRoot = EnsureDictionaryFoldersCreated(nestedInFolders);
+                var targetDictionaryRoot = EnsureDictionaryFoldersCreated(nestedInFolders, language);
 
                 var targetDictionaryEntryItemName = GenerateItemName(key);
-                var createdDictionaryEntry = _siteContext.MasterDb.GetItem(targetDictionaryRoot.Paths.Path + "/" + targetDictionaryEntryItemName) ??
+				var createdDictionaryEntry = _siteContext.MasterDb.GetItem(targetDictionaryRoot.Paths.Path + "/" + targetDictionaryEntryItemName, language) ??
                                              targetDictionaryRoot.Add(targetDictionaryEntryItemName, Constants.DictionaryEntryTemplateId);
 
 	            if (createdDictionaryEntry.Versions.Count == 0)
@@ -157,21 +203,28 @@ namespace Sitecore.SharedSource.Localization.Domain
                 }
 
                 _dictionaryCache.SetCache(key, createdDictionaryEntry.ID.Guid);
-                _siteContext.Publish(createdDictionaryEntry);
+				_siteContext.Publish(createdDictionaryEntry, language);
 
                 return createdDictionaryEntry;
             }
         }
 
-        protected Item EnsureDictionaryFoldersCreated(string translationGroupPath)
+		/// <summary>
+		/// Ensures the dictionary folders created.
+		/// </summary>
+		/// <param name="translationGroupPath">The translation group path.</param>
+		/// <param name="language">The language.</param>
+		/// <returns></returns>
+        protected Item EnsureDictionaryFoldersCreated(string translationGroupPath, Language language)
         {
-            var currentRoot = _siteContext.GetDictionaryRoot(_siteContext.MasterDb);
+	        var currentRoot = _siteContext.GetDictionaryRoot(_siteContext.MasterDb, language);
 
             foreach (var folderName in translationGroupPath.Split(new[] { '/' }, StringSplitOptions.RemoveEmptyEntries))
             {
                 var safeFolderName = GenerateItemName(folderName);
                 var targetDictionaryGroupPath = string.Format("{0}/{1}", currentRoot.Paths.Path, safeFolderName);
-                var targetFolder = _siteContext.MasterDb.GetItem(targetDictionaryGroupPath);
+                
+				var targetFolder = _siteContext.MasterDb.GetItem(targetDictionaryGroupPath, language);
 
                 if (targetFolder == null)
                 {
@@ -183,7 +236,7 @@ namespace Sitecore.SharedSource.Localization.Domain
                             currentRoot.ID.Guid), this);
 
 
-                    _siteContext.Publish(currentRoot);
+					_siteContext.Publish(currentRoot, language);
                 }
                 else
                 {

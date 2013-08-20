@@ -4,7 +4,6 @@ using System.Linq;
 using System.Web;
 using Sitecore.Data;
 using Sitecore.Data.Items;
-using Sitecore.Data.Managers;
 using Sitecore.Globalization;
 using Sitecore.Publishing;
 using Sitecore.SecurityModel;
@@ -53,7 +52,7 @@ namespace Sitecore.SharedSource.Localization.Domain
         /// <value>The sitecore Item which is mapped to be dictionary root.</value>
         public virtual Item DictionaryRoot
         {
-            get { return GetDictionaryRoot(ContextDb); }
+            get { return GetDictionaryRoot(ContextDb, Context.Language); }
         }
 
         /// <summary>
@@ -76,12 +75,13 @@ namespace Sitecore.SharedSource.Localization.Domain
             return Context.GetSiteName();
         }
 
-        /// <summary>
-        /// Gets the dictionary root.
-        /// </summary>
-        /// <param name="contextDb">The context db.</param>
-        /// <returns>Item.</returns>
-        public virtual Item GetDictionaryRoot(Database contextDb)
+	    /// <summary>
+	    /// Gets the dictionary root.
+	    /// </summary>
+	    /// <param name="contextDb">The context db.</param>
+	    /// <param name="language"></param>
+	    /// <returns>Item.</returns>
+	    public virtual Item GetDictionaryRoot(Database contextDb, Language language)
         {
             Item rootItem = null;
 
@@ -91,18 +91,19 @@ namespace Sitecore.SharedSource.Localization.Domain
 
                 if (!string.IsNullOrEmpty(dictionaryRootItemPath))
                 {
-                    rootItem = contextDb.GetItem(dictionaryRootItemPath) ?? CreateDictionaryRoot(dictionaryRootItemPath);
+					rootItem = contextDb.GetItem(dictionaryRootItemPath, language) ?? CreateDictionaryRoot(dictionaryRootItemPath, language);
                 }
             }
 
-	        return rootItem ?? (contextDb.GetItem(ModuleSettings.GlobalDictionaryFolder));
+			return rootItem ?? (contextDb.GetItem(ModuleSettings.GlobalDictionaryFolder, language) ?? CreateDictionaryRoot(ModuleSettings.GlobalDictionaryFolder, language));
         }
 
-        /// <summary>
-        /// Publishes the specified item root.
-        /// </summary>
-        /// <param name="itemRoot">The item root.</param>
-        public virtual void Publish(Item itemRoot)
+	    /// <summary>
+	    /// Publishes the specified item root.
+	    /// </summary>
+	    /// <param name="itemRoot">The item root.</param>
+	    /// <param name="language"></param>
+	    public virtual void Publish(Item itemRoot, Language language = null)
         {
 	        if (ModuleSettings.AutoPublishCreatedItems)
 	        {
@@ -115,7 +116,7 @@ namespace Sitecore.SharedSource.Localization.Domain
 			        publishingTargetConnectionStrings.All(
 				        x => x != ConfigurationManager.ConnectionStrings["master"].ConnectionString.ToLower()))
 		        {
-			        var targetLanguages = GetTargetLanguages();
+					var targetLanguages = new[] { language ?? Context.Language };
 
 			        Logger.Info(string.Format(
 				        "Publishing item {0} to '{1}' languages...",
@@ -170,22 +171,22 @@ namespace Sitecore.SharedSource.Localization.Domain
             return siteName;
         }
 
-        protected virtual Item CreateDictionaryRoot(string dictionaryRootItemPath)
+        protected virtual Item CreateDictionaryRoot(string dictionaryRootItemPath, Language language)
         {
             using (new SecurityDisabler())
             {
                 var nodeNames = dictionaryRootItemPath.Split(new[] { '/' }, StringSplitOptions.RemoveEmptyEntries);
-                var currentRoot = MasterDb.GetItem("/" + nodeNames[0] + "/");
+				var currentRoot = MasterDb.GetItem("/" + nodeNames[0] + "/", language);
 
                 for (var i = 1; i < nodeNames.Length; i++)
                 {
                     var targetDictionaryRoot = string.Format("{0}/{1}", currentRoot.Paths.Path, nodeNames[i]);
-                    var targetFolder = MasterDb.GetItem(targetDictionaryRoot);
+					var targetFolder = MasterDb.GetItem(targetDictionaryRoot, language);
 
                     if (targetFolder == null)
                     {
                         currentRoot = currentRoot.Add(nodeNames[i], Constants.DictionaryRootTemplateId);
-                        Publish(currentRoot);
+						Publish(currentRoot, language);
                     }
                     else
                     {
@@ -249,11 +250,6 @@ namespace Sitecore.SharedSource.Localization.Domain
             }
 
             return insertOptionsGuidArray;
-        }
-
-        protected Language[] GetTargetLanguages()
-        {
-            return LanguageManager.GetLanguages(MasterDb).ToArray();
         }
 
         protected static Database[] GetPublishingTargets(Database sourceDatabase)

@@ -32,7 +32,7 @@
         /// <summary>
         /// The localization create items with default values
         /// </summary>
-        public static bool LocalizationCreateItemsWithDefaultValues
+        public static bool CreateItemsWithDefaultValues
         {
             get { return System.Convert.ToBoolean(Configuration.Settings.GetSetting("Localization.CreateItemsWithDefaultValues", "True")); }
         }
