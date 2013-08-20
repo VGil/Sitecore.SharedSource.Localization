@@ -57,5 +57,16 @@
         {
             return Configuration.Settings.GetSetting(string.Format("Localization.{0}.DictionaryFolder", siteName), null);
         }
+
+		/// <summary>
+		/// Determines whether to publish automatically created items with default values.
+		/// </summary>
+		/// <value>
+		/// <c>true</c> if [auto publish created items]; otherwise, <c>false</c>.
+		/// </value>
+		public static bool AutoPublishCreatedItems
+	    {
+			get { return Configuration.Settings.GetBoolSetting("Localization.AutoPublishCreatedItems", true); }
+	    }
     }
 }

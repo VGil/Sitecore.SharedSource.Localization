@@ -95,12 +95,7 @@ namespace Sitecore.SharedSource.Localization.Domain
                 }
             }
 
-            if (rootItem == null)
-            {
-                rootItem = contextDb.GetItem(ModuleSettings.GlobalDictionaryFolder);
-            }
-
-            return rootItem;
+	        return rootItem ?? (contextDb.GetItem(ModuleSettings.GlobalDictionaryFolder));
         }
 
         /// <summary>
@@ -109,21 +104,32 @@ namespace Sitecore.SharedSource.Localization.Domain
         /// <param name="itemRoot">The item root.</param>
         public virtual void Publish(Item itemRoot)
         {
-            var publishingTargets = GetPublishingTargets(itemRoot.Database);
-            var publishingTargetConnectionStrings = publishingTargets.Select(x => ConfigurationManager.ConnectionStrings[x.Name.ToLower()].ConnectionString.ToLower());
+	        if (ModuleSettings.AutoPublishCreatedItems)
+	        {
+		        var publishingTargets = GetPublishingTargets(itemRoot.Database);
+		        var publishingTargetConnectionStrings =
+			        publishingTargets.Select(
+				        x => ConfigurationManager.ConnectionStrings[x.Name.ToLower()].ConnectionString.ToLower());
 
-            if (publishingTargetConnectionStrings.All(x => x != ConfigurationManager.ConnectionStrings["master"].ConnectionString.ToLower()))
-            {
-                var targetLanguages = GetTargetLanguages();
+		        if (
+			        publishingTargetConnectionStrings.All(
+				        x => x != ConfigurationManager.ConnectionStrings["master"].ConnectionString.ToLower()))
+		        {
+			        var targetLanguages = GetTargetLanguages();
 
-                Logger.Info(string.Format(
-                        "Publishing item {0} to '{1}' languages...", 
-                        itemRoot.Paths.Path, 
-                        string.Join("', '", targetLanguages.Select(x => x.Name))), 
-                    this);
+			        Logger.Info(string.Format(
+				        "Publishing item {0} to '{1}' languages...",
+				        itemRoot.Paths.Path,
+				        string.Join("', '", targetLanguages.Select(x => x.Name))),
+			                    this);
 
-                PublishManager.PublishItem(itemRoot, publishingTargets, targetLanguages, true, false);
-            }
+			        PublishManager.PublishItem(itemRoot, publishingTargets, targetLanguages, true, false);
+		        }
+	        }
+	        else
+	        {
+				Logger.ExtraInfo("Publishing disabled for automatically created items. For enabling autopublishing set 'Localization.AutoPublishCreatedItems' settings to true.", this);
+	        }
         }
 
         #region Private 
@@ -261,11 +267,11 @@ namespace Sitecore.SharedSource.Localization.Domain
 
         protected virtual IDictionary<Guid, string> GetAllConfiguredSites()
         {
-            if (m_ConfiguredSites.Count == 0)
+            if (_configuredSites.Count == 0)
             {
-                lock (m_ConfiguredSites)
+                lock (_configuredSites)
                 {
-                    if (m_ConfiguredSites.Count == 0)
+                    if (_configuredSites.Count == 0)
                     {
                         var ignoredSitesList = new[] { "shell", "modules_shell", "modules_website", "login", "scheduler", "publisher", "system" };
                         var sites = SiteManager.GetSites();
@@ -275,19 +281,19 @@ namespace Sitecore.SharedSource.Localization.Domain
                             var itemPath = site.Properties["rootPath"] + "/" + site.Properties["startItem"];
                             itemPath = itemPath.Replace("//", "/").TrimEnd('/');
                             var item = ContextDb.GetItem(itemPath);
-                            if (item != null && !ignoredSitesList.Contains(site.Name) && !m_ConfiguredSites.ContainsKey(item.ID.Guid))
+                            if (item != null && !ignoredSitesList.Contains(site.Name) && !_configuredSites.ContainsKey(item.ID.Guid))
                             {
-                                m_ConfiguredSites.Add(item.ID.Guid, site.Name);
+                                _configuredSites.Add(item.ID.Guid, site.Name);
                             }
                         }
                     }
                 }
             }
 
-            return m_ConfiguredSites;
+            return _configuredSites;
         }
 
-        protected static IDictionary<Guid, string> m_ConfiguredSites = new Dictionary<Guid, string>();
+        protected static IDictionary<Guid, string> _configuredSites = new Dictionary<Guid, string>();
 
         #endregion
     }

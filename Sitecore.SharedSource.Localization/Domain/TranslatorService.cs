@@ -11,10 +11,19 @@ namespace Sitecore.SharedSource.Localization.Domain
 {
     internal class TranslatorService
     {
-        protected SiteContext m_SiteContext = new SiteContext();
-        protected SitecoreDictionaryCacheManager m_DictionaryCache = new SitecoreDictionaryCacheManager();
+        protected SiteContext _siteContext = new SiteContext();
+        protected SitecoreDictionaryCacheManager _dictionaryCache = new SitecoreDictionaryCacheManager();
 
-        /// <summary>
+	    public TranslatorService()
+	    {
+		    var folderTemplate = _siteContext.MasterDb.GetItem(Constants.DictionaryFolderTemplateId);
+			var translationTemplate = _siteContext.MasterDb.GetItem(Constants.DictionaryEntryTemplateId);
+
+			EnsureDictionaryTemplateHasCorrectIcon(folderTemplate, "People/32x32/book_yellow.png");
+			EnsureDictionaryTemplateHasCorrectIcon(translationTemplate, "Applications/32x32/font.png");
+	    }
+
+	    /// <summary>
         /// Gets translated phrase for context language by specified translation key.
         /// With option of formatting like string.Format() method functionality.
         /// Dictionary entry item will be created if it doesn't exist with default phrase value 
@@ -48,7 +57,7 @@ namespace Sitecore.SharedSource.Localization.Domain
 
                 var result = fieldRenderer.Render();
 
-                if (formatParams != null && formatParams.Length > 0 && !m_SiteContext.IsPageEditor)
+                if (formatParams != null && formatParams.Length > 0 && !_siteContext.IsPageEditor)
                 {
                     return string.Format(result, formatParams);
                 }
@@ -79,8 +88,8 @@ namespace Sitecore.SharedSource.Localization.Domain
             var nestedInFolders = string.Empty;
             if (key.Contains("/"))
             {
-                nestedInFolders = key.Substring(0, key.LastIndexOf("/"));
-                key = key.Substring(key.LastIndexOf("/") + 1, key.Length - key.LastIndexOf("/") - 1);
+				nestedInFolders = key.Substring(0, key.LastIndexOf("/", StringComparison.InvariantCulture));
+				key = key.Substring(key.LastIndexOf("/", StringComparison.InvariantCulture) + 1, key.Length - key.LastIndexOf("/", StringComparison.InvariantCulture) - 1);
             }
 
             if (string.IsNullOrEmpty(defaultValue))
@@ -92,7 +101,7 @@ namespace Sitecore.SharedSource.Localization.Domain
 
             if (ModuleSettings.LocalizationCreateItemsWithDefaultValues)
             {
-                return !m_DictionaryCache.DictionaryEntryExists(key)
+                return !_dictionaryCache.DictionaryEntryExists(key)
                     ? CreateDictionaryEntryWithDefaultValue(key, defaultValue, nestedInFolders)
                     : GetDictionaryEntry(key);
             }
@@ -104,10 +113,10 @@ namespace Sitecore.SharedSource.Localization.Domain
 
         protected Item GetDictionaryEntry(string key)
         {
-            var itemId = m_DictionaryCache.GetCache(key);
+            var itemId = _dictionaryCache.GetCache(key);
             if (itemId != Guid.Empty)
             {
-                return m_SiteContext.ContextDb.GetItem(new ID(itemId));
+                return _siteContext.ContextDb.GetItem(new ID(itemId));
             }
 
             return null;
@@ -120,14 +129,10 @@ namespace Sitecore.SharedSource.Localization.Domain
                 var targetDictionaryRoot = EnsureDictionaryFoldersCreated(nestedInFolders);
 
                 var targetDictionaryEntryItemName = GenerateItemName(key);
-                var createdDictionaryEntry = m_SiteContext.MasterDb.GetItem(targetDictionaryRoot.Paths.Path + "/" + targetDictionaryEntryItemName);
-                
-                if (createdDictionaryEntry == null)
-                {
-                    createdDictionaryEntry = targetDictionaryRoot.Add(targetDictionaryEntryItemName, Constants.DictionaryEntryTemplateId);
-                }
-                
-                if (createdDictionaryEntry.Versions.Count == 0)
+                var createdDictionaryEntry = _siteContext.MasterDb.GetItem(targetDictionaryRoot.Paths.Path + "/" + targetDictionaryEntryItemName) ??
+                                             targetDictionaryRoot.Add(targetDictionaryEntryItemName, Constants.DictionaryEntryTemplateId);
+
+	            if (createdDictionaryEntry.Versions.Count == 0)
                 {
                     createdDictionaryEntry = createdDictionaryEntry.Versions.AddVersion();
                 }
@@ -138,8 +143,6 @@ namespace Sitecore.SharedSource.Localization.Domain
                     createdDictionaryEntry[Constants.DictionaryEntryKeyFieldName] = key;
                     createdDictionaryEntry[Constants.DictionaryEntryPhraseFieldName] = defaultValue;
                     createdDictionaryEntry.Editing.EndEdit();
-
-                    EnsureDictionaryTemplateHasCorrectIcon(createdDictionaryEntry.Template.InnerItem, "Applications/32x32/font.png");
 
                     Logger.Info(string.Format(
                         "Dictionary entry '{0}' with ID {1} created with default value.",
@@ -153,8 +156,8 @@ namespace Sitecore.SharedSource.Localization.Domain
                     createdDictionaryEntry.Editing.CancelEdit();
                 }
 
-                m_DictionaryCache.SetCache(key, createdDictionaryEntry.ID.Guid);
-                m_SiteContext.Publish(createdDictionaryEntry);
+                _dictionaryCache.SetCache(key, createdDictionaryEntry.ID.Guid);
+                _siteContext.Publish(createdDictionaryEntry);
 
                 return createdDictionaryEntry;
             }
@@ -162,13 +165,13 @@ namespace Sitecore.SharedSource.Localization.Domain
 
         protected Item EnsureDictionaryFoldersCreated(string translationGroupPath)
         {
-            var currentRoot = m_SiteContext.GetDictionaryRoot(m_SiteContext.MasterDb);
+            var currentRoot = _siteContext.GetDictionaryRoot(_siteContext.MasterDb);
 
             foreach (var folderName in translationGroupPath.Split(new[] { '/' }, StringSplitOptions.RemoveEmptyEntries))
             {
                 var safeFolderName = GenerateItemName(folderName);
                 var targetDictionaryGroupPath = string.Format("{0}/{1}", currentRoot.Paths.Path, safeFolderName);
-                var targetFolder = m_SiteContext.MasterDb.GetItem(targetDictionaryGroupPath);
+                var targetFolder = _siteContext.MasterDb.GetItem(targetDictionaryGroupPath);
 
                 if (targetFolder == null)
                 {
@@ -179,9 +182,8 @@ namespace Sitecore.SharedSource.Localization.Domain
                             currentRoot.Paths.Path,
                             currentRoot.ID.Guid), this);
 
-                    EnsureDictionaryTemplateHasCorrectIcon(currentRoot.Template.InnerItem, "People/32x32/book_yellow.png");
 
-                    m_SiteContext.Publish(currentRoot);
+                    _siteContext.Publish(currentRoot);
                 }
                 else
                 {
@@ -192,30 +194,26 @@ namespace Sitecore.SharedSource.Localization.Domain
             return currentRoot;
         }
 
-        protected void EnsureDictionaryTemplateHasCorrectIcon(Item createdDictionaryTemplate, string iconFilename)
+        protected void EnsureDictionaryTemplateHasCorrectIcon(Item translationTemplate, string iconFilename)
         {
-            var needPublish = false;
-            try
-            {
-                createdDictionaryTemplate.Editing.BeginEdit();
-                if (string.IsNullOrEmpty(createdDictionaryTemplate["__Icon"]))
-                {
-                    createdDictionaryTemplate["__Icon"] = iconFilename;
-                    needPublish = true;
-                }
-                createdDictionaryTemplate.Editing.EndEdit();
+	        using (new SecurityDisabler())
+	        {
+		        try
+		        {
+			        if (string.IsNullOrEmpty(translationTemplate["__Icon"]))
+			        {
+				        translationTemplate.Editing.BeginEdit();
+				        translationTemplate["__Icon"] = iconFilename;
+				        translationTemplate.Editing.EndEdit();
+			        }
+		        }
+		        catch (Exception ex)
+		        {
+			        Logger.Error(string.Format("Error setting the icon to template '{0}'", translationTemplate.ID.Guid), ex, this);
 
-                if (needPublish)
-                {
-                    m_SiteContext.Publish(createdDictionaryTemplate);
-                }
-            }
-            catch (Exception ex)
-            {
-                Logger.Error(string.Format("Error setting the icon to template '{0}'", createdDictionaryTemplate.ID.Guid), ex, this);
-
-                createdDictionaryTemplate.Editing.CancelEdit();
-            }
+			        translationTemplate.Editing.CancelEdit();
+		        }
+	        }
         }
 
         protected string GenerateItemName(string key)
