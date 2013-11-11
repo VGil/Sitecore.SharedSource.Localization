@@ -117,7 +117,7 @@ namespace Sitecore.SharedSource.Localization.Domain
 			    entry = GetDictionaryEntry(key, language);
 		    }
 
-		    if (string.IsNullOrEmpty(entry[Constants.DICTIONARY_ENTRY_PHRASE_FIELD_NAME]))
+		    if (string.IsNullOrEmpty(entry[Constants.DictionaryEntryPhraseFieldId]))
 		    {
 				Logger.ExtraInfo(string.Format(
 						"Creating translation item version for key '{0}' with default value '{1}' and Language '{2}'", 
@@ -138,8 +138,8 @@ namespace Sitecore.SharedSource.Localization.Domain
 
 							entry.Editing.BeginEdit();
 
-							entry[Constants.DICTIONARY_ENTRY_PHRASE_FIELD_NAME] = defaultValue;
-							entry[Constants.DICTIONARY_ENTRY_KEY_FIELD_NAME] = key;
+							entry[Constants.DictionaryEntryPhraseFieldId] = defaultValue;
+							entry[Constants.DictionaryEntryKeyFieldId] = key;
 
 							entry.Editing.EndEdit();
 						}
@@ -186,8 +186,8 @@ namespace Sitecore.SharedSource.Localization.Domain
                 try
                 {
                     createdDictionaryEntry.Editing.BeginEdit();
-                    createdDictionaryEntry[Constants.DICTIONARY_ENTRY_KEY_FIELD_NAME] = key;
-                    createdDictionaryEntry[Constants.DICTIONARY_ENTRY_PHRASE_FIELD_NAME] = defaultValue;
+                    createdDictionaryEntry[Constants.DictionaryEntryKeyFieldId] = key;
+                    createdDictionaryEntry[Constants.DictionaryEntryPhraseFieldId] = defaultValue;
                     createdDictionaryEntry.Editing.EndEdit();
 
                     Logger.Info(string.Format(
